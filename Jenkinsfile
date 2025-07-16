@@ -39,11 +39,11 @@ pipeline {
       echo "✅ Başarılı: ${IMAGE_NAME}:${TAG}"
     }
     failure {
-<<<<<<< HEAD
+
       echo "❌ Pipeline başarısız. Hata test adımını atlayarak build/deploy kısmına bak."  
-=======
+
       echo "❌ Pipeline başarısız. Hata test adımını atlayarak build/deploy kısmına bak."
->>>>>>> f00400f (başa döndürdüm)
+
     }
   }
 }
