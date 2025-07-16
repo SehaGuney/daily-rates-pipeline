@@ -1,5 +1,10 @@
 pipeline {
-  agent any
+  agent {
+    docker {
+      image 'python:3.9-slim'
+      args  '-v /var/run/docker.sock:/var/run/docker.sock'
+    }
+  }
 
   environment {
     IMAGE_NAME = "yourdockerhubusername/daily-rates"
@@ -9,7 +14,6 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        // Sadece bir kez checkout, doğru branch ve credential ile:
         checkout([$class: 'GitSCM',
           branches: [[name: '*/main']],
           doGenerateSubmoduleConfigurations: false,
@@ -24,6 +28,7 @@ pipeline {
 
     stage('Install & Test') {
       steps {
+        sh 'pip install --upgrade pip'
         sh 'pip install -r app/requirements.txt'
         sh 'pytest tests'
       }
@@ -32,6 +37,7 @@ pipeline {
     stage('Build Docker Image') {
       steps {
         script {
+          // Docker CLI container içinde de çalışsın diye bind-mount ettik
           docker.build("${IMAGE_NAME}:${TAG}", "-f Dockerfile .")
         }
       }
