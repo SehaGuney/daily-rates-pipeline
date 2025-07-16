@@ -1,5 +1,4 @@
 services:
-  # Metadata database
   postgres:
     image: postgres:13
     environment:
@@ -9,11 +8,9 @@ services:
     volumes:
       - postgres_db:/var/lib/postgresql/data
 
-  # Broker for CeleryExecutor
   redis:
     image: redis:6
 
-  # Airflow components
   airflow:
     image: apache/airflow:2.6.2
     depends_on:
@@ -24,14 +21,13 @@ services:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     volumes:
-      - ./airflow_home:/root/airflow            # metadata DB & config persist
-      - ./dags:/opt/airflow/dags                # DAG kodları
-      - ./artifacts:/opt/airflow/artifacts      # çıktı/raporlar
+      - ./airflow_home:/root/airflow
+      - ./dags:/opt/airflow/dags
+      - ./artifacts:/opt/airflow/artifacts
     ports:
       - "8082:8080"
     command: webserver
 
-  # Flask uygulaması
   web:
     build: .
     volumes:
@@ -39,5 +35,17 @@ services:
     ports:
       - "5000:5000"
 
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    ports:
+      - "8081:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+
 volumes:
   postgres_db:
+  jenkins_home:
