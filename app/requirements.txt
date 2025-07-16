@@ -1,0 +1,3 @@
+Flask
+requests
+apache-airflow-providers-http

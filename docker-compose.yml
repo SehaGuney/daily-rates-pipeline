@@ -1,0 +1,43 @@
+services:
+  # Metadata database
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_db:/var/lib/postgresql/data
+
+  # Broker for CeleryExecutor
+  redis:
+    image: redis:6
+
+  # Airflow components
+  airflow:
+    image: apache/airflow:2.6.2
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    volumes:
+      - ./airflow_home:/root/airflow            # metadata DB & config persist
+      - ./dags:/opt/airflow/dags                # DAG kodları
+      - ./artifacts:/opt/airflow/artifacts      # çıktı/raporlar
+    ports:
+      - "8082:8080"
+    command: webserver
+
+  # Flask uygulaması
+  web:
+    build: .
+    volumes:
+      - ./artifacts:/app/artifacts
+    ports:
+      - "5000:5000"
+
+volumes:
+  postgres_db:
