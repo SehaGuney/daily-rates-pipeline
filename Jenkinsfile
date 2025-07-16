@@ -1,10 +1,5 @@
 pipeline {
-  agent {
-    docker {
-      image 'python:3.9-slim'
-      args  '-v /var/run/docker.sock:/var/run/docker.sock'
-    }
-  }
+  agent any
 
   environment {
     IMAGE_NAME = "yourdockerhubusername/daily-rates"
@@ -28,16 +23,20 @@ pipeline {
 
     stage('Install & Test') {
       steps {
-        sh 'pip install --upgrade pip'
-        sh 'pip install -r app/requirements.txt'
-        sh 'pytest tests'
+        script {
+          // Python imajı içinde pip ve pytest çalıştırmak için:
+          docker.image('python:3.9-slim').inside('-v /var/run/docker.sock:/var/run/docker.sock') {
+            sh 'pip install --upgrade pip'
+            sh 'pip install -r app/requirements.txt'
+            sh 'pytest tests'
+          }
+        }
       }
     }
 
     stage('Build Docker Image') {
       steps {
         script {
-          // Docker CLI container içinde de çalışsın diye bind-mount ettik
           docker.build("${IMAGE_NAME}:${TAG}", "-f Dockerfile .")
         }
       }
