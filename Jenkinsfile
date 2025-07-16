@@ -1,30 +1,65 @@
 pipeline {
   agent any
+
+  environment {
+    IMAGE_NAME = "yourdockerhubusername/daily-rates"
+    TAG        = "${env.BUILD_NUMBER}"
+  }
+
   stages {
     stage('Checkout') {
-      steps { git 'https://github.com/SehaGuney/mlops-practice.git' }
+      steps {
+        // Sadece bir kez checkout, doğru branch ve credential ile:
+        checkout([$class: 'GitSCM',
+          branches: [[name: '*/main']],
+          doGenerateSubmoduleConfigurations: false,
+          extensions: [],
+          userRemoteConfigs: [[
+            url: 'https://github.com/SehaGuney/mlops-practice.git',
+            credentialsId: 'github-creds'
+          ]]
+        ])
+      }
     }
-    stage('Test') {
-      steps { sh 'pytest tests' }
+
+    stage('Install & Test') {
+      steps {
+        sh 'pip install -r app/requirements.txt'
+        sh 'pytest tests'
+      }
     }
-    stage('Build & Push') {
+
+    stage('Build Docker Image') {
       steps {
         script {
-          docker.build('youruser/daily-rates:latest')
-          docker.withRegistry('', 'docker-hub-creds') {
-            docker.image('youruser/daily-rates:latest').push()
-          }
+          docker.build("${IMAGE_NAME}:${TAG}", "-f Dockerfile .")
         }
       }
     }
+
+    stage('Push to Registry') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+          sh "echo $PASS | docker login -u $USER --password-stdin"
+          sh "docker push ${IMAGE_NAME}:${TAG}"
+        }
+      }
+    }
+
     stage('Deploy') {
       steps {
-        sh 'docker-compose down && docker-compose up -d'
+        sh 'docker-compose down'
+        sh 'docker-compose up -d'
       }
     }
   }
+
   post {
-    success { echo '✅ Başarılı!' }
-    failure { echo '❌ Hata var, kontrol et.' }
+    success {
+      echo "✅ Pipeline tamamlandı: ${IMAGE_NAME}:${TAG}"
+    }
+    failure {
+      echo "❌ Pipeline başarısız."
+    }
   }
 }
