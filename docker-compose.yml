@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+
+  redis:
+    image: redis:6
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  airflow:
+    image: apache/airflow:2.6.2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+    volumes:
+      - ./airflow_home:/root/airflow
+      - ./dags:/opt/airflow/dags
+      - ./artifacts:/opt/airflow/artifacts
+    ports:
+      - "8082:8080"
+    command: webserver
+    restart: unless-stopped
+
+  web:
+    build: .
+    volumes:
+      - ./artifacts:/app/artifacts
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+
+  # Jenkins with Docker support
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins
+    container_name: jenkins
+    ports:
+      - "8081:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+    restart: unless-stopped
+    user: root  # Docker socket erişimi için
+    
+volumes:
+  postgres_db:
+  jenkins_home:
