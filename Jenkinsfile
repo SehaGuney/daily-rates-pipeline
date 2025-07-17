@@ -360,9 +360,9 @@ generate_currency_report()
                         cp ${ARTIFACTS_DIR}/latest_rates.json ${REPORT_DIR}/
                         
                         # Create build summary
-                        echo "Build #${BUILD_NUMBER} - $(date)" > ${REPORT_DIR}/build_summary.txt
+                        echo "Build #${BUILD_NUMBER} - \$(date)" > ${REPORT_DIR}/build_summary.txt
                         echo "Status: SUCCESS" >> ${REPORT_DIR}/build_summary.txt
-                        echo "Currency data updated: $(date)" >> ${REPORT_DIR}/build_summary.txt
+                        echo "Currency data updated: \$(date)" >> ${REPORT_DIR}/build_summary.txt
                         
                         # List all generated files
                         ls -la ${REPORT_DIR}/
