@@ -1,11 +1,6 @@
 pipeline {
     agent any
     
-    environment {
-        DOCKER_IMAGE = "daily-rates-app"
-        DOCKER_TAG = "${env.BUILD_ID}"
-    }
-    
     stages {
         stage('Checkout') {
             steps {
@@ -16,9 +11,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Docker imajını build et
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                    sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
+                    sh 'docker build -t daily-rates-app:2 .'
+                    sh 'docker tag daily-rates-app:2 daily-rates-app:latest'
                 }
             }
         }
@@ -26,14 +20,7 @@ pipeline {
         stage('Test') {
             steps {
                 script {
-                    // Test container'ını çalıştır
-                    sh """
-                        docker run --rm ${DOCKER_IMAGE}:${DOCKER_TAG} python -c "
-                        import sys
-                        print('Python version:', sys.version)
-                        print('Container test passed!')
-                        "
-                    """
+                    sh 'docker run --rm daily-rates-app:2 python -c "import sys; print(\'Python version:\', sys.version); print(\'Container test passed!\')"'
                 }
             }
         }
@@ -41,17 +28,8 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    // Eski container'ları durdur
-                    sh "docker stop daily-rates-container || true"
-                    sh "docker rm daily-rates-container || true"
-                    
-                    // Yeni container'ı başlat
-                    sh """
-                        docker run -d \
-                            --name daily-rates-container \
-                            -p 5001:5000 \
-                            ${DOCKER_IMAGE}:${DOCKER_TAG}
-                    """
+                    echo "Deployment işlemleri burada yapılacak"
+                    // Deployment komutlarınızı buraya ekleyin
                 }
             }
         }
@@ -59,17 +37,12 @@ pipeline {
     
     post {
         always {
-            // Workspace temizleme
             script {
-                try {
-                    cleanWs()
-                } catch (Exception e) {
-                    echo "Workspace cleanup failed: ${e.getMessage()}"
-                }
+                echo "Pipeline tamamlandı"
             }
         }
         success {
-            echo "✅ Pipeline başarıyla tamamlandı!"
+            echo "✅ Pipeline başarılı!"
         }
         failure {
             echo "❌ Pipeline başarısız oldu!"
