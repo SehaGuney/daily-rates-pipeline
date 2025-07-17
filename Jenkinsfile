@@ -20,10 +20,10 @@ pipeline {
         stage('Test & Generate Report') {
             steps {
                 script {
-                    // 1) Container içinde basit doğrulama
+                    // Container testi
                     sh 'docker run --rm daily-rates-app:2 python -c "import sys; print(\'Python version:\', sys.version); print(\'Container test passed!\')"'
 
-                    // 2) pytest ile HTML rapor üretimi
+                    // pytest ile rapor üret
                     sh '''
                         mkdir -p reports
                         pytest tests \
@@ -39,7 +39,7 @@ pipeline {
             steps {
                 script {
                     echo "Deployment işlemleri burada yapılacak"
-                    // Deployment komutlarınızı buraya ekleyin
+                    // Buraya deploy komutlarını ekle
                 }
             }
         }
@@ -47,14 +47,15 @@ pipeline {
 
     post {
         always {
-            // Opsiyonel: JUnit test sonuçlarını de arşivle
+            // JUnit sonuçlarını arşivle (opsiyonel)
             junit 'reports/junit-results.xml'
 
-            // HTML raporu Jenkins’e "Küçük Rapor" sekmesi olarak ekle
+            // HTML raporu ekle, allowMissing eklendi
             publishHTML([
                 reportDir             : 'reports',
                 reportFiles           : 'report.html',
                 reportName            : 'Küçük Rapor',
+                allowMissing          : true,
                 keepAll               : false,
                 alwaysLinkToLastBuild : true
             ])
@@ -69,4 +70,3 @@ pipeline {
         }
     }
 }
-
