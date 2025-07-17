@@ -56,7 +56,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.jenkins
-    container_name: jenkins-currency-app
+    container_name: jenkins
     ports:
       - "8081:8080"
       - "50000:50000"
