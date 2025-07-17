@@ -20,16 +20,18 @@ pipeline {
         stage('Test & Generate Report') {
             steps {
                 script {
-                    // Container testi
+                    // 1) Container testi
                     sh 'docker run --rm daily-rates-app:2 python -c "import sys; print(\'Python version:\', sys.version); print(\'Container test passed!\')"'
 
-                    // pytest ile rapor üret
+                    // 2) pytest + HTML rapor => container içinde pip yükle, volume ile host'a al
                     sh '''
-                        mkdir -p reports
-                        pytest tests \
-                          --junitxml=reports/junit-results.xml \
-                          --html=reports/report.html \
-                          --self-contained-html
+                        mkdir -p ${WORKSPACE}/reports
+                        docker run --rm \
+                          -v "${WORKSPACE}/reports":/app/reports \
+                          daily-rates-app:2 bash -c "pip install pytest pytest-html && pytest tests \
+                            --junitxml=/app/reports/junit-results.xml \
+                            --html=/app/reports/report.html \
+                            --self-contained-html"
                     '''
                 }
             }
@@ -47,10 +49,10 @@ pipeline {
 
     post {
         always {
-            // JUnit sonuçlarını arşivle (opsiyonel)
+            // JUnit sonuçlarını arşivle
             junit 'reports/junit-results.xml'
 
-            // HTML raporu ekle, allowMissing eklendi
+            // HTML raporu ekle
             publishHTML([
                 reportDir             : 'reports',
                 reportFiles           : 'report.html',
