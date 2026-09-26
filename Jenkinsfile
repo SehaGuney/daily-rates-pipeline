@@ -1,51 +1,53 @@
 pipeline {
     agent any
-    
+
+    environment {
+        IMAGE = 'daily-rates-app'
+    }
+
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-        
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    sh 'docker build -t daily-rates-app:2 .'
-                    sh 'docker tag daily-rates-app:2 daily-rates-app:latest'
-                }
-            }
-        }
-        
+
         stage('Test') {
             steps {
-                script {
-                    sh 'docker run --rm daily-rates-app:2 python -c "import sys; print(\'Python version:\', sys.version); print(\'Container test passed!\')"'
-                }
+                // Runs pytest inside the "test" build stage; fails the build if any test fails
+                sh 'docker build --target test -t ${IMAGE}:test .'
             }
         }
-        
-        stage('Deploy') {
+
+        stage('Build') {
             steps {
-                script {
-                    echo "Deployment işlemleri burada yapılacak"
-                    // Deployment komutlarınızı buraya ekleyin
+                sh 'docker build --target runtime -t ${IMAGE}:${BUILD_NUMBER} -t ${IMAGE}:latest .'
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                sh '''
+                    docker rm -f daily-rates-smoke || true
+                    docker run -d --name daily-rates-smoke ${IMAGE}:${BUILD_NUMBER}
+                    sleep 3
+                    docker exec daily-rates-smoke python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"
+                '''
+            }
+            post {
+                always {
+                    sh 'docker rm -f daily-rates-smoke || true'
                 }
             }
         }
     }
-    
+
     post {
-        always {
-            script {
-                echo "Pipeline tamamlandı"
-            }
-        }
         success {
-            echo "✅ Pipeline başarılı!"
+            echo "Build ${BUILD_NUMBER} passed: ${IMAGE}:${BUILD_NUMBER}"
         }
         failure {
-            echo "❌ Pipeline başarısız oldu!"
+            echo "Build ${BUILD_NUMBER} failed"
         }
     }
 }
