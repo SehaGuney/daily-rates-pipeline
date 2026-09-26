@@ -1,0 +1,16 @@
+# Gizli bilgiler
+.env
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Pipeline çıktıları
+artifacts/
+
+# Airflow
+logs/
+
+# macOS
+.DS_Store

@@ -1,39 +1,60 @@
+import csv
+import json
+import os
+from datetime import datetime, timedelta
+
+import requests
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.http.operators.http import SimpleHttpOperator
-from datetime import datetime, timedelta
-import requests, csv, os
 
-def fetch_and_report(**ctx):
-    url = "https://api.exchangerate.host/latest?base=EUR"
-    data = requests.get(url).json()["rates"]
-    dt = ctx["ds"]
-    os.makedirs("artifacts", exist_ok=True)
-    csv_path = f"artifacts/rates_{dt}.csv"
+API_URL = "https://api.frankfurter.dev/v1/latest"
+BASE_CURRENCY = "EUR"
+CURRENCIES = ["USD", "GBP", "TRY", "JPY", "CHF"]
+ARTIFACTS_DIR = os.environ.get("ARTIFACTS_DIR", "/opt/airflow/artifacts")
+
+
+def fetch_and_report(ds, **_):
+    """Fetch the latest EUR rates and write CSV + JSON artifacts for the run date."""
+    response = requests.get(
+        API_URL,
+        params={"base": BASE_CURRENCY, "symbols": ",".join(CURRENCIES)},
+        timeout=10,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    rates = payload["rates"]
+
+    os.makedirs(ARTIFACTS_DIR, exist_ok=True)
+
+    csv_path = os.path.join(ARTIFACTS_DIR, f"rates_{ds}.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["currency","rate"])
-        for k,v in data.items():
-            writer.writerow([k,v])
-    rates = list(data.values())
-    report = {
-        "date": dt,
-        "min": min(rates),
-        "max": max(rates),
-        "avg": sum(rates)/len(rates)
-    }
-    with open(f"artifacts/report_{dt}.json","w") as f:
-        import json; json.dump(report,f)
+        writer.writerow(["currency", "rate"])
+        writer.writerows(sorted(rates.items()))
 
-def trigger_jenkins():
-    # Airflow HTTP hook ile tetik; connection jenkins_api tanımlı olmalı
-    from airflow.providers.http.operators.http import SimpleHttpOperator
-    # (Or, burada requests ile direk çağrı da yapabiliriz)
-    pass
+    report = {
+        "date": ds,
+        "rate_date": payload["date"],
+        "base": payload["base"],
+        "rates": rates,
+    }
+    report_path = os.path.join(ARTIFACTS_DIR, f"report_{ds}.json")
+    with open(report_path, "w") as f:
+        json.dump(report, f, indent=2)
+
+
+default_args = {
+    "owner": "seha",
+    "retries": 2,
+    "retry_delay": timedelta(minutes=5),
+}
 
 with DAG(
-    "daily_rates",
-    start_date=datetime(2025,7,1),
+    dag_id="daily_rates",
+    description="Fetch daily EUR exchange rates and trigger CI",
+    default_args=default_args,
+    start_date=datetime(2025, 7, 1),
     schedule_interval="0 9 * * *",
     catchup=False,
 ) as dag:
@@ -41,15 +62,13 @@ with DAG(
     fetch = PythonOperator(
         task_id="fetch_and_report",
         python_callable=fetch_and_report,
-        provide_context=True,
     )
 
-    trigger = SimpleHttpOperator(
+    trigger_ci = SimpleHttpOperator(
         task_id="trigger_ci",
         http_conn_id="jenkins_api",
         endpoint="job/daily-rates-pipeline/build",
         method="POST",
-        headers={"Content-Type":"application/json"},
     )
 
-    fetch >> trigger
+    fetch >> trigger_ci
