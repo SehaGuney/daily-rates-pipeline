@@ -1,21 +1,44 @@
-from app import app
 import json
 
-def test_latest_report_no_file(tmp_path, monkeypatch):
-    # artifacts klasörü yoksa 404 dönmeli
+import pytest
+
+from app import app
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    client = app.test_client()
+    return app.test_client()
+
+
+def test_health(client):
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "healthy"
+
+
+def test_latest_report_no_artifacts(client):
     resp = client.get("/latest-report")
     assert resp.status_code == 404
 
-def test_latest_report(tmp_path, monkeypatch):
-    # bir rapor dosyası yarat
-    report = {"date":"2025-07-16","min":0.5,"max":1.5,"avg":1.0}
-    (tmp_path / "artifacts").mkdir()
-    f = tmp_path / "artifacts" / "report_20250716.json"
-    f.write_text(json.dumps(report))
-    monkeypatch.chdir(tmp_path)
-    client = app.test_client()
+
+def test_latest_report_returns_newest(client, tmp_path):
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    old = {"date": "2026-09-24", "base": "EUR", "rates": {"USD": 1.10}}
+    new = {"date": "2026-09-25", "base": "EUR", "rates": {"USD": 1.14}}
+    (artifacts / "report_2026-09-24.json").write_text(json.dumps(old))
+    (artifacts / "report_2026-09-25.json").write_text(json.dumps(new))
+
     resp = client.get("/latest-report")
     assert resp.status_code == 200
-    assert json.loads(resp.data) == report
+    assert resp.get_json() == new
+
+
+def test_latest_report_invalid_json(client, tmp_path):
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "report_2026-09-25.json").write_text("not json")
+
+    resp = client.get("/latest-report")
+    assert resp.status_code == 500
